@@ -1,6 +1,6 @@
 import { ContractConfig } from '../types/contract';
 import { EscrowParams, EscrowState, SDKResult, GetGigsParams, GigsPage } from '../types/index';
-import { xlmToStroops } from '../utils/validation';
+import { xlmToStroops, STELLAR_ADDRESS_RE, CONTRACT_ID_RE, isValidEscrowId } from '../utils/validation';
 import { createApiHttpClient, toApiErrorMessage } from '../utils/http';
 import type { ApiRetryConfig } from '../utils/http';
 import type { HttpInterceptors } from '../utils/interceptors';

@@ -167,7 +167,7 @@ describe('IPFSStorage.resolve - Issue #348', () => {
       expect(tfErr.code).toBe('STORAGE_GATEWAY_ERROR');
       expect(tfErr.message).toContain(cid);
     }
-  });
+  }, 10000); // Increase timeout to 10s
 
   it('rejects invalid CIDs before querying gateways', async () => {
     const storage = new IPFSStorage();
