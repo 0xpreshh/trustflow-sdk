@@ -66,6 +66,37 @@ function decodeBase32(str: string): Uint8Array | null {
 }
 
 /**
+ * Validates the multicodec varint and multihash structure of a CIDv1 payload.
+ * Expects bytes starting with the CID version (0x01), followed by a multicodec varint,
+ * then a multihash (function code + length + digest).
+ *
+ * @param bytes - The decoded CID bytes (version + multicodec + multihash)
+ * @returns true if the structure is valid, false otherwise
+ */
+function validateCidv1Structure(bytes: Uint8Array): boolean {
+  if (bytes.length < 4) return false;
+  // Byte 0 must be CIDv1 (0x01)
+  if (bytes[0] !== 0x01) return false;
+
+  // Read multicodec varint starting at offset 1
+  let offset = 1;
+  while (offset < bytes.length && (bytes[offset] & 0x80) !== 0) {
+    offset++;
+  }
+  offset++; // Skip final byte of varint
+  if (offset >= bytes.length - 2) return false;
+
+  // Read multihash function and length
+  const hashFunc = bytes[offset];
+  const hashLen = bytes[offset + 1];
+  const remaining = bytes.length - (offset + 2);
+
+  // sha2-256 header verification when 0x12
+  if (hashFunc === 0x12 && hashLen !== 32) return false;
+  return remaining === hashLen;
+}
+
+/**
  * Validates whether a value is a strictly valid CIDv0 or CIDv1 string.
  *
  * For CIDv0 (Qm... 46 chars):
@@ -95,35 +126,16 @@ export function isValidCid(value: unknown): boolean {
   if (value.startsWith('b')) {
     if (value.length < 50 || !/^[a-z2-7]+$/.test(value.slice(1))) return false;
     const bytes = decodeBase32(value.slice(1));
-    if (!bytes || bytes.length < 4) return false;
-    // Byte 0 must be CIDv1 (0x01)
-    if (bytes[0] !== 0x01) return false;
-
-    // Read multicodec varint starting at offset 1
-    let offset = 1;
-    while (offset < bytes.length && (bytes[offset] & 0x80) !== 0) {
-      offset++;
-    }
-    offset++; // Skip final byte of varint
-    if (offset >= bytes.length - 2) return false;
-
-    // Read multihash function and length
-    const hashFunc = bytes[offset];
-    const hashLen = bytes[offset + 1];
-    const remaining = bytes.length - (offset + 2);
-
-    // sha2-256 header verification when 0x12
-    if (hashFunc === 0x12 && hashLen !== 32) return false;
-    return remaining === hashLen;
+    if (!bytes) return false;
+    return validateCidv1Structure(bytes);
   }
 
   // CIDv1 base58btc (starts with 'z')
   if (value.startsWith('z')) {
     if (value.length < 40) return false;
     const bytes = decodeBase58(value.slice(1));
-    if (!bytes || bytes.length < 4) return false;
-    if (bytes[0] !== 0x01) return false;
-    return true;
+    if (!bytes) return false;
+    return validateCidv1Structure(bytes);
   }
 
   return false;

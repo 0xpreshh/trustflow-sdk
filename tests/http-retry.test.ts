@@ -74,6 +74,36 @@ describe('shouldRetryRequest', () => {
       ),
     ).toBe(true);
   });
+
+  describe('cancelled request handling - Issue #450', () => {
+    it('never retries a cancelled GET request', () => {
+      const cancelError = new axios.CanceledError('canceled');
+      (cancelError as any).config = { method: 'get' };
+      expect(shouldRetryRequest(cancelError)).toBe(false);
+    });
+
+    it('never retries a cancelled POST request', () => {
+      const cancelError = new axios.CanceledError('canceled');
+      (cancelError as any).config = { method: 'post' };
+      expect(shouldRetryRequest(cancelError)).toBe(false);
+    });
+
+    it('never retries when error.code is ERR_CANCELED', () => {
+      const error = { config: { method: 'get' }, code: 'ERR_CANCELED' };
+      expect(shouldRetryRequest(error)).toBe(false);
+    });
+
+    it('distinguishes cancellation from genuine transport failures', () => {
+      // Genuine transport failure (no response, not cancelled) - should retry
+      const transportError = { config: { method: 'get' }, code: 'ECONNRESET' };
+      expect(shouldRetryRequest(transportError)).toBe(true);
+
+      // Cancelled request (no response, but cancelled) - should NOT retry
+      const cancelError = new axios.CanceledError('canceled');
+      (cancelError as any).config = { method: 'get' };
+      expect(shouldRetryRequest(cancelError)).toBe(false);
+    });
+  });
 });
 
 describe('apiRetryDelay', () => {
@@ -324,6 +354,51 @@ describe('installApiRetryInterceptor', () => {
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[0][0]).toBe(request.mock.calls[1][0]);
     expect(request.mock.calls[1][0].__trustflowAttempts).toBe(2);
+  });
+
+  describe('cancelled request handling - Issue #450', () => {
+    it('rethrows a cancelled GET request immediately without retry', async () => {
+      const { fail, request } = harness();
+      const cancelError = new axios.CanceledError('canceled');
+      (cancelError as any).config = { method: 'get' };
+
+      await expect(fail(cancelError)).rejects.toBe(cancelError);
+      // Should NOT call request (no retry)
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('does not sleep or replay when a GET is cancelled', async () => {
+      const { fail, request } = harness({ retryDelayMs: 1000 });
+      const cancelError = new axios.CanceledError('canceled');
+      (cancelError as any).config = { method: 'get' };
+
+      const start = Date.now();
+      await expect(fail(cancelError)).rejects.toBe(cancelError);
+      const elapsed = Date.now() - start;
+
+      // Should reject immediately (no sleep), so elapsed should be < 100ms
+      expect(elapsed).toBeLessThan(100);
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('distinguishes cancellation from transport failures in retry logic', async () => {
+      const { fail, request, enqueueOk } = harness();
+
+      // Transport failure (ECONNRESET) - should retry and succeed
+      enqueueOk({ status: 200, data: 'ok' });
+      const transportError = { code: 'ECONNRESET', config: { method: 'get' } };
+      await expect(fail(transportError)).resolves.toEqual({ status: 200, data: 'ok' });
+      expect(request).toHaveBeenCalledTimes(1);
+
+      // Reset
+      request.mockClear();
+
+      // Cancelled request - should NOT retry
+      const cancelError = new axios.CanceledError('canceled');
+      (cancelError as any).config = { method: 'get' };
+      await expect(fail(cancelError)).rejects.toBe(cancelError);
+      expect(request).not.toHaveBeenCalled();
+    });
   });
 });
 

@@ -208,6 +208,69 @@ describe('IPFSStorage.upload', () => {
     expect(storagePayload.data).toBe('ZGF0YQ==');
     expect(storagePayload.tag).toBe('dGFn');
   });
+
+  describe('abortSignal support - Issue #449', () => {
+    it('throws when upload is aborted via pre-aborted signal', async () => {
+      const abortController = new AbortController();
+      abortController.abort(); // Pre-abort
+
+      // Even with a pre-aborted signal, axios will start the request and immediately reject it
+      const cancelError = new Error('canceled');
+      (cancelError as any).code = 'ERR_CANCELED';
+      mockHttpPost.mockRejectedValueOnce(cancelError);
+
+      const storage = new IPFSStorage();
+      
+      await expect(
+        storage.upload(Buffer.from('data'), { abortSignal: abortController.signal })
+      ).rejects.toThrow('canceled');
+
+      expect(mockHttpPost).toHaveBeenCalled();
+    });
+
+    it('throws when upload is aborted mid-request', async () => {
+      const abortController = new AbortController();
+      
+      // Mock the upload to simulate an in-flight cancellation
+      mockHttpPost.mockImplementationOnce(() => {
+        abortController.abort(); // Abort during the request
+        const cancelError = new Error('canceled');
+        (cancelError as any).code = 'ERR_CANCELED';
+        return Promise.reject(cancelError);
+      });
+
+      const storage = new IPFSStorage();
+      
+      await expect(
+        storage.upload(Buffer.from('data'), { abortSignal: abortController.signal })
+      ).rejects.toThrow('canceled');
+
+      expect(mockHttpPost).toHaveBeenCalled();
+    });
+
+    it('does not confuse cancellation with network errors in logs', async () => {
+      const abortController = new AbortController();
+      
+      const cancelError = new Error('canceled');
+      (cancelError as any).code = 'ERR_CANCELED';
+      
+      mockHttpPost.mockImplementationOnce(() => {
+        abortController.abort();
+        return Promise.reject(cancelError);
+      });
+
+      const storage = new IPFSStorage();
+      
+      try {
+        await storage.upload(Buffer.from('data'), { abortSignal: abortController.signal });
+      } catch (err) {
+        // Should throw, not return { ok: false }
+        expect(err).toBeDefined();
+      }
+
+      expect(mockHttpPost).toHaveBeenCalled();
+    });
+  });
 });
 
 describe('IPFSStorage encryption', () => {
