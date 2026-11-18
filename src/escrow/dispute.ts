@@ -4,6 +4,7 @@ import type { DisputeEscrowParams } from '../types';
 import { Dispute, DisputeParams, SDKResult } from '../types/index';
 import { TrustFlowError } from '../errors';
 import { buildDisputeArgs } from '../contract/build';
+import { invokeContract } from '../contract/invoke';
 import { createApiHttpClient, toApiErrorMessage } from '../utils/http';
 import type { ApiRetryConfig } from '../utils/http';
 import type { HttpInterceptors } from '../utils/interceptors';
@@ -19,14 +20,12 @@ import { isValidEscrowId } from '../utils/validation';
  * `DisputeClient.raiseDispute`, which records the dispute with the backend
  * API rather than the on-chain contract.
  *
- * @param _client - Configured {@link TrustFlowClient}, reserved for the
- * contract call once a live signer is wired in
+ * @param client - Configured {@link TrustFlowClient}
  * @param params - Dispute parameters: `escrowId`, `caller` and `reason`
- * @returns A dispute transaction identifier. This is currently a locally
- * generated placeholder, not an on-chain hash, until the encoded arguments are
- * passed to the shared tx-pipeline.
+ * @returns The on-chain transaction hash of the submitted dispute
  * @throws {TrustFlowError} `VALIDATION_ERROR` if `escrowId` or `reason` is
- * missing or blank, or `UNAUTHORIZED` if `caller` is missing
+ * missing or blank, or `UNAUTHORIZED` if `caller` is missing. Also rejects
+ * with the wrapped on-chain error when the contract invocation fails.
  *
  * @example
  * ```typescript
@@ -38,7 +37,7 @@ import { isValidEscrowId } from '../utils/validation';
  * ```
  */
 export async function disputeEscrow(
-  _client: TrustFlowClient,
+  client: TrustFlowClient,
   params: DisputeEscrowParams,
 ): Promise<string> {
   if (!params.escrowId) {
@@ -50,12 +49,12 @@ export async function disputeEscrow(
   if (!params.reason || !params.reason.trim()) {
     throw TrustFlowError.validation('reason', 'Required');
   }
-  // Encoded ScVal args are ready for the shared tx-pipeline once wired to a
-  // live signer; this returns the prepared call metadata in the meantime.
   const args = buildDisputeArgs(params.escrowId, params.caller, params.reason);
-  void args;
-  // Soroban contract call: dispute(escrow_id, caller, reason)
-  return `tx_dispute_${params.escrowId}_${Date.now()}`;
+  const result = await invokeContract(client, 'dispute_escrow', args, params.caller);
+  if (!result.success || typeof result.txHash !== 'string') {
+    throw TrustFlowError.wrap(new Error(result.error || 'Escrow dispute failed'), result.code);
+  }
+  return result.txHash;
 }
 
 /** Constructor options for {@link DisputeClient}. */
