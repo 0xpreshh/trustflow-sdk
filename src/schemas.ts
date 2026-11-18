@@ -160,6 +160,7 @@ export const ClientConfigSchema = z.object({
     })
     .optional(),
   horizonUrl: z.string().url('Horizon URL must be a valid URL').optional(),
+  rpcHeaders: z.record(z.string()).optional(),
   networkPassphrase: z
     .string()
     .refine((value) => value.trim().length > 0, 'Network passphrase must not be empty')
