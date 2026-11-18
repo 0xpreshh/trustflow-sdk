@@ -165,6 +165,16 @@ describe('exported Zod schemas', () => {
       expect(result.data.rpcFailover?.rpcUrls).toEqual(['https://rpc.example.com']);
     });
 
+    it('keeps rpcHeaders instead of silently dropping it (#602)', () => {
+      const result = ClientConfigSchema.safeParse({
+        contractId: CONTRACT_ID,
+        rpcHeaders: { 'x-api-key': 'abc' },
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.rpcHeaders).toEqual({ 'x-api-key': 'abc' });
+    });
+
     it('rejects an invalid account address and a non-positive timeoutMs (#437)', () => {
       expect(
         ClientConfigSchema.safeParse({

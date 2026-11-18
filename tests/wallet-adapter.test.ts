@@ -47,6 +47,44 @@ describe('createFreighterAdapter (#435)', () => {
     expect(signTransaction).toHaveBeenCalledWith('xdr', { network: 'TESTNET' });
     await expect(adapter.signMessage('hello')).resolves.toBe('sig');
   });
+
+  it('wraps a rejected signTransaction/signMessage as a TrustFlowError with code USER_REJECTED', async () => {
+    const rejection = { code: 4001, message: 'User declined access' };
+    installFreighter({
+      getPublicKey: jest.fn().mockResolvedValue(PUBLIC_KEY),
+      getNetwork: jest.fn().mockResolvedValue('TESTNET'),
+      signTransaction: jest.fn().mockRejectedValue(rejection),
+      signMessage: jest.fn().mockRejectedValue(rejection),
+    });
+    const adapter = createFreighterAdapter();
+
+    const signPromise = adapter.sign('xdr', 'TESTNET');
+    await expect(signPromise).rejects.toBeInstanceOf(TrustFlowError);
+    await expect(signPromise).rejects.toMatchObject({ code: 'USER_REJECTED' });
+
+    const signMessagePromise = adapter.signMessage('hello');
+    await expect(signMessagePromise).rejects.toBeInstanceOf(TrustFlowError);
+    await expect(signMessagePromise).rejects.toMatchObject({ code: 'USER_REJECTED' });
+  });
+
+  it('wraps a non-rejection signTransaction/signMessage failure as a TrustFlowError with code SIGNING_ERROR', async () => {
+    const failure = new Error('extension crashed');
+    installFreighter({
+      getPublicKey: jest.fn().mockResolvedValue(PUBLIC_KEY),
+      getNetwork: jest.fn().mockResolvedValue('TESTNET'),
+      signTransaction: jest.fn().mockRejectedValue(failure),
+      signMessage: jest.fn().mockRejectedValue(failure),
+    });
+    const adapter = createFreighterAdapter();
+
+    const signPromise = adapter.sign('xdr', 'TESTNET');
+    await expect(signPromise).rejects.toBeInstanceOf(TrustFlowError);
+    await expect(signPromise).rejects.toMatchObject({ code: 'SIGNING_ERROR' });
+
+    const signMessagePromise = adapter.signMessage('hello');
+    await expect(signMessagePromise).rejects.toBeInstanceOf(TrustFlowError);
+    await expect(signMessagePromise).rejects.toMatchObject({ code: 'SIGNING_ERROR' });
+  });
 });
 
 describe('MockWalletAdapter.asWalletAdapter (#435)', () => {

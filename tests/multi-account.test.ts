@@ -66,6 +66,17 @@ describe('AccountManager', () => {
     expect(accounts.has(ALICE)).toBe(false);
   });
 
+  it('stops resolving an existing id by its old address once re-registered under a new address', () => {
+    const accounts = new AccountManager();
+    accounts.add({ id: 'wallet-slot', address: ALICE });
+    accounts.add({ id: 'wallet-slot', address: BOB });
+
+    expect(accounts.get(ALICE)).toBeNull();
+    expect(accounts.has(ALICE)).toBe(false);
+    expect(accounts.get(BOB)?.id).toBe('wallet-slot');
+    expect(accounts.has(BOB)).toBe(true);
+  });
+
   it('rejects a blank or malformed address', () => {
     const accounts = new AccountManager();
     expect(() => accounts.add({ address: '' })).toThrow(TrustFlowError);
