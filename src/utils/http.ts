@@ -134,10 +134,16 @@ export function isMethodRetryable(error: unknown): boolean {
  * and only for idempotent methods, or a call that set `trustflowRetry: true`.
  * Every other `4xx` is a client error that will fail identically.
  *
+ * Cancelled requests (via AbortSignal) are never retried.
+ *
  * @param error - The rejected axios error
  * @returns Whether to replay the request
  */
 export function shouldRetryRequest(error: unknown): boolean {
+  // Never retry cancelled requests
+  if (axios.isCancel(error) || (error as any)?.code === 'ERR_CANCELED') {
+    return false;
+  }
   if (!isMethodRetryable(error)) return false;
   const status = (error as { response?: { status?: number } }).response?.status;
   if (status === undefined) return true; // transport failure
@@ -337,6 +343,9 @@ export function createApiHttpClient(options: ApiHttpClientOptions): AxiosInstanc
  * parsed off axios' own message) rather than the generic
  * `Network error: timeout of <n>ms exceeded`, so callers can branch on
  * "the server was slow" without string-matching axios internals.
+ *
+ * Cancellations (via AbortSignal) are reported as `Request was cancelled`
+ * to distinguish them from genuine network failures.
  */
 export function toApiErrorMessage(error: unknown): string {
   // Errors raised locally by the SDK (such as a rejected oversized body) already
@@ -345,6 +354,10 @@ export function toApiErrorMessage(error: unknown): string {
     return error.message;
   }
   if (error instanceof AxiosError) {
+    // Check for cancellation (AbortSignal)
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
+      return 'Request was cancelled';
+    }
     const status = error.response?.status;
     const statusText = error.response?.statusText;
     if (typeof status === 'number') {

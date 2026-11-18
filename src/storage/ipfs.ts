@@ -58,6 +58,8 @@ const DEFAULT_FALLBACK_GATEWAYS = [
   'https://cloudflare-ipfs.com/ipfs',
   'https://dweb.link/ipfs',
 ];
+/** Default maximum response size: 10 MB */
+const DEFAULT_MAX_CONTENT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /** Build consistent path-style gateway URLs for both uploads and reads. */
 function gatewayCidUrl(gateway: string, cid: string): string {
@@ -79,6 +81,12 @@ export interface IPFSConfig {
   gateways?: string[];
   /** Request timeout in milliseconds. Defaults to 10s. */
   timeoutMs?: number;
+  /**
+   * Maximum response body size in bytes for gateway resolution.
+   * Prevents unbounded memory use from oversized responses.
+   * Defaults to 10 MB (10_485_760 bytes).
+   */
+  maxContentBytes?: number;
   /**
    * Retry budget for upload requests. Defaults to 3 retries with a 250ms base
    * delay and a 2s cap.
@@ -107,6 +115,11 @@ export interface IPFSUploadResult {
 export interface IPFSResolveOptions {
   /** Request timeout in milliseconds for gateway resolution. */
   timeoutMs?: number;
+  /**
+   * Maximum response body size in bytes for this resolution request.
+   * Overrides the instance-level maxContentBytes if provided.
+   */
+  maxContentBytes?: number;
   /** Abort signal for cancelling the resolve request. */
   abortSignal?: AbortSignal;
 }
@@ -128,10 +141,12 @@ export class IPFSStorage {
   private readonly gateways: string[];
   private readonly http: AxiosInstance;
   private readonly timeoutMs: number;
+  private readonly maxContentBytes: number;
 
   constructor(config: IPFSConfig = {}) {
     this.gatewayUrl = config.gatewayUrl ?? DEFAULT_IPFS_GATEWAY;
     this.timeoutMs = config.timeoutMs ?? 10_000;
+    this.maxContentBytes = config.maxContentBytes ?? DEFAULT_MAX_CONTENT_BYTES;
 
     if (config.gateways && config.gateways.length > 0) {
       this.gateways = [...config.gateways];
@@ -193,6 +208,11 @@ export class IPFSStorage {
       logger.info('IPFS upload succeeded', { cid });
       return { ok: true, data: { cid, url: gatewayCidUrl(this.gatewayUrl, cid) } };
     } catch (err) {
+      // Re-throw abort errors immediately so callers can distinguish cancellation from failure
+      if (options.abortSignal?.aborted) {
+        const abortError = err instanceof Error ? err : new Error(String(err));
+        throw abortError;
+      }
       logger.error('IPFS upload failed', { error: toApiErrorMessage(err) });
       return { ok: false, error: toApiErrorMessage(err) };
     }
@@ -201,11 +221,11 @@ export class IPFSStorage {
   /**
    * Resolves content from IPFS gateways by CID with automatic secondary gateway fallback.
    *
-   * Handles empty 200 OK bodies, HTML error pages, invalid JSON, and network errors gracefully
-   * by trying fallback gateways in order.
+   * Handles empty 200 OK bodies, HTML error pages, invalid JSON, oversized responses,
+   * and network errors gracefully by trying fallback gateways in order.
    *
    * @param cid - CID to resolve
-   * @param options - Optional timeout override
+   * @param options - Optional timeout and size limit overrides
    * @returns Parsed JSON content as type T
    * @throws {TrustFlowError} `STORAGE_GATEWAY_ERROR` when all gateways fail, or `VALIDATION_ERROR` for invalid CID.
    */
@@ -216,6 +236,7 @@ export class IPFSStorage {
 
     const errors: string[] = [];
     const timeout = options.timeoutMs ?? this.timeoutMs;
+    const maxContentBytes = options.maxContentBytes ?? this.maxContentBytes;
     const abortSignal = options.abortSignal;
 
     for (const gateway of this.gateways) {
@@ -229,6 +250,8 @@ export class IPFSStorage {
           responseType: 'text',
           transformResponse: [(d) => d],
           validateStatus: (status) => status >= 200 && status < 300,
+          maxContentLength: maxContentBytes,
+          maxBodyLength: maxContentBytes,
         });
 
         const contentType = String(response.headers?.['content-type'] ?? '').toLowerCase();
@@ -277,7 +300,16 @@ export class IPFSStorage {
           const abortError = reqError instanceof Error ? reqError : new Error(String(reqError));
           throw abortError;
         }
-        const err = `Gateway ${cleanGateway} request failed: ${reqError?.message || String(reqError)}`;
+        
+        // Check if this is a content-size-limit error
+        const isOverLimit = 
+          reqError?.code === 'ERR_BAD_RESPONSE' || 
+          reqError?.message?.includes('maxContentLength') ||
+          reqError?.message?.includes('maxBodyLength');
+        
+        const err = isOverLimit
+          ? `Gateway ${cleanGateway} response exceeded size limit of ${maxContentBytes} bytes`
+          : `Gateway ${cleanGateway} request failed: ${reqError?.message || String(reqError)}`;
         logger.warn(err, { cid });
         errors.push(err);
         continue;
