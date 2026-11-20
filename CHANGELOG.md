@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Multi-sig operation binding, mock wallet parity and abort helper docs (#715, #660, #655)
+
+- Issue #715: Added tests for `MultiSigEscrowClient.addSignature` showing that a signed XDR for a different operation is rejected and stored nowhere, plus coverage for the normal, failure and authorisation paths.
+- Issue #660: `createPlaywrightWalletScript()` now signs messages as `mock_sig_<message>`, matching `toFreighterGlobal().signMessage`, and tests check both injection paths return the same result.
+- Issue #655: Documented `trackAndDestroyOnAbort` in `src/utils/connection-pool.ts` as a manual, opt-in helper that the SDK's own request paths do not call, and clarified the matching test suite as isolated-only.
+
 ### Single CID validator (#562)
 
 - Issue #562: `isValidCID`, `isValidCIDv0`, `isValidCIDv1`, `assertValidCID` and `getCIDVersion` in `src/utils/validation.ts` now delegate to the decode-based validator in `src/storage/cid.ts`, so `isValidCid`/`isValidCID` always agree. Previously the regex versions rejected valid CIDv1 strings with multicodecs other than dag-pb, dag-cbor, raw and dag-json.
