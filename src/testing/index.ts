@@ -612,7 +612,7 @@ export function createPlaywrightWalletScript(options: MockWalletAdapterOptions =
         return { signedXDR: xdr };
       },
       getNetwork: async () => 'TESTNET',
-      signMessage: async (msg) => 'mock_signature'
+      signMessage: async (msg) => 'mock_sig_' + msg
     };
   `;
 }

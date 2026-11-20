@@ -8,6 +8,26 @@
 - Issue #621: Guarded `useWallet.connect()` with a monotonic call id so superseded connection attempts cannot overwrite newer wallet, error, rejection, or loading state.
 - Issue #622: Stopped the synchronous `useJuror.createVoteCommitment` and `revealVote` wrappers from toggling `loading`; the flag now documents as tracking only the asynchronous `vote()` call.
 - Issue #623: Validated the CID portion of `ipfs://` avatar URLs in `ProfileClient.updateProfile` with the SDK's `isValidCid` validator.
+### Sandbox README environment variables (#659)
+
+- Issue #659: Removed the "Configuration & Environment Variables" section from `examples/react/README.md`; the `VITE_*` variables it documented are never read by the sandbox.
+
+### invokeContract gasUsed fallback (#646)
+
+- Issue #646: `invokeContract` now falls back to `minResourceFee` when `cost.cpuInsns` is zero or missing, comparing numerically instead of relying on string truthiness.
+
+### storage-resolve test mock queue (#658)
+
+- Issue #658: `STORAGE_GATEWAY_ERROR` test in `tests/storage-resolve.test.ts` now resolves once against its three queued mocks and fails on any unexpected `axios.get` call instead of reaching the network.
+
+### Stale axios-retry references (#647)
+
+- Issue #647: Removed `axios-retry` from the direct dependency list in `SECURITY.md` and the auto-retry roadmap item in `README.md`; the SDK has no such dependency.
+### Multi-sig operation binding, mock wallet parity and abort helper docs (#715, #660, #655)
+
+- Issue #715: Added tests for `MultiSigEscrowClient.addSignature` showing that a signed XDR for a different operation is rejected and stored nowhere, plus coverage for the normal, failure and authorisation paths.
+- Issue #660: `createPlaywrightWalletScript()` now signs messages as `mock_sig_<message>`, matching `toFreighterGlobal().signMessage`, and tests check both injection paths return the same result.
+- Issue #655: Documented `trackAndDestroyOnAbort` in `src/utils/connection-pool.ts` as a manual, opt-in helper that the SDK's own request paths do not call, and clarified the matching test suite as isolated-only.
 
 ### Single CID validator (#562)
 

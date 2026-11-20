@@ -124,7 +124,8 @@ export async function invokeContract(
     logger.debug('Contract simulation successful', { method, gasUsed: simulation.cost });
 
     if (!signAndSubmit) {
-      const gasUsed = Number(simulation.cost?.cpuInsns || simulation.minResourceFee || 0);
+      const cpuInsns = Number(simulation.cost?.cpuInsns);
+      const gasUsed = cpuInsns > 0 ? cpuInsns : Number(simulation.minResourceFee) || 0;
       return {
         success: true,
         returnValue: simulation.returnValue,
@@ -149,7 +150,8 @@ export async function invokeContract(
     const txHash = await signAndSubmit(xdr);
 
     logger.info('Contract call submitted', { method, txHash });
-    const gasUsed = Number(simulation.cost?.cpuInsns || simulation.minResourceFee || 0);
+    const cpuInsns = Number(simulation.cost?.cpuInsns);
+    const gasUsed = cpuInsns > 0 ? cpuInsns : Number(simulation.minResourceFee) || 0;
     return {
       success: true,
       txHash,
