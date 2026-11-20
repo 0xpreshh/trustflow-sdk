@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Issue #620: Enforced the documented `maxJsonLength` limit in `validateRequestSize` so the configured and default JSON string-length limits reject oversized bodies before the UTF-8 byte-size check.
+- Issue #621: Guarded `useWallet.connect()` with a monotonic call id so superseded connection attempts cannot overwrite newer wallet, error, rejection, or loading state.
+- Issue #622: Stopped the synchronous `useJuror.createVoteCommitment` and `revealVote` wrappers from toggling `loading`; the flag now documents as tracking only the asynchronous `vote()` call.
+- Issue #623: Validated the CID portion of `ipfs://` avatar URLs in `ProfileClient.updateProfile` with the SDK's `isValidCid` validator.
 ### Sandbox README environment variables (#659)
 
 - Issue #659: Removed the "Configuration & Environment Variables" section from `examples/react/README.md`; the `VITE_*` variables it documented are never read by the sandbox.
