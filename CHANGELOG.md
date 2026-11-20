@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Sandbox README environment variables (#659)
+
+- Issue #659: Removed the "Configuration & Environment Variables" section from `examples/react/README.md`; the `VITE_*` variables it documented are never read by the sandbox.
+
+### invokeContract gasUsed fallback (#646)
+
+- Issue #646: `invokeContract` now falls back to `minResourceFee` when `cost.cpuInsns` is zero or missing, comparing numerically instead of relying on string truthiness.
+
+### storage-resolve test mock queue (#658)
+
+- Issue #658: `STORAGE_GATEWAY_ERROR` test in `tests/storage-resolve.test.ts` now resolves once against its three queued mocks and fails on any unexpected `axios.get` call instead of reaching the network.
+
+### Stale axios-retry references (#647)
+
+- Issue #647: Removed `axios-retry` from the direct dependency list in `SECURITY.md` and the auto-retry roadmap item in `README.md`; the SDK has no such dependency.
+
 ### Single CID validator (#562)
 
 - Issue #562: `isValidCID`, `isValidCIDv0`, `isValidCIDv1`, `assertValidCID` and `getCIDVersion` in `src/utils/validation.ts` now delegate to the decode-based validator in `src/storage/cid.ts`, so `isValidCid`/`isValidCID` always agree. Previously the regex versions rejected valid CIDv1 strings with multicodecs other than dag-pb, dag-cbor, raw and dag-json.
