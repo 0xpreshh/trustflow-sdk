@@ -17,6 +17,11 @@
 ### Stale axios-retry references (#647)
 
 - Issue #647: Removed `axios-retry` from the direct dependency list in `SECURITY.md` and the auto-retry roadmap item in `README.md`; the SDK has no such dependency.
+### Multi-sig operation binding, mock wallet parity and abort helper docs (#715, #660, #655)
+
+- Issue #715: Added tests for `MultiSigEscrowClient.addSignature` showing that a signed XDR for a different operation is rejected and stored nowhere, plus coverage for the normal, failure and authorisation paths.
+- Issue #660: `createPlaywrightWalletScript()` now signs messages as `mock_sig_<message>`, matching `toFreighterGlobal().signMessage`, and tests check both injection paths return the same result.
+- Issue #655: Documented `trackAndDestroyOnAbort` in `src/utils/connection-pool.ts` as a manual, opt-in helper that the SDK's own request paths do not call, and clarified the matching test suite as isolated-only.
 
 ### Single CID validator (#562)
 
