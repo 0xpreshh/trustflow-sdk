@@ -356,8 +356,8 @@ unscoped key, so sessions written by earlier SDK versions still load.
   `dist/hooks/index.mjs` start with a `'use client'` directive. The entry exports hooks that call
   `useState`, `useEffect` and `useCallback`, so in the Next.js App Router importing it from a
   Server Component — or from any file that is not itself marked `'use client'` — failed, forcing
-  every consumer to re-wrap the hooks in their own client file. The repo's own `.env.example` uses
-  `NEXT_PUBLIC_*` variables, so App Router consumers are the expected audience. The root, `/escrow`,
+  every consumer to re-wrap the hooks in their own client file. Next.js App Router consumers are the
+  expected audience. The root, `/escrow`,
   `/wallet` and `/utils` entries are deliberately left unmarked so they stay server-safe. The
   directive is injected into the build output by `scripts/inject-use-client.js`, run after `tsup`
   in `npm run build`, because a module-level directive does not survive bundling — a `'use client'`
